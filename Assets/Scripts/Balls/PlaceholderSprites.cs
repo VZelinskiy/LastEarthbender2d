@@ -7,6 +7,35 @@ using UnityEngine;
 public static class PlaceholderSprites
 {
     static Sprite circle;
+    static Sprite square;
+
+    /// <summary>A plain white square, exactly 1 world unit wide.</summary>
+    public static Sprite Square
+    {
+        get
+        {
+            if (square != null) return square;
+
+            const int size = 4;
+            var texture = new Texture2D(size, size, TextureFormat.RGBA32, false)
+            {
+                name = "PlaceholderSquare",
+                filterMode = FilterMode.Point,
+                wrapMode = TextureWrapMode.Clamp
+            };
+
+            var pixels = new Color32[size * size];
+            for (int pixelIndex = 0; pixelIndex < pixels.Length; pixelIndex++)
+                pixels[pixelIndex] = new Color32(255, 255, 255, 255);
+
+            texture.SetPixels32(pixels);
+            texture.Apply();
+
+            square = Sprite.Create(texture, new Rect(0, 0, size, size), new Vector2(0.5f, 0.5f), size);
+            square.name = "PlaceholderSquare";
+            return square;
+        }
+    }
 
     public static Sprite Circle
     {

@@ -119,6 +119,58 @@ NavMeshSettings:
     debug:
       m_Flags: 0
   m_NavMeshData: {fileID: 0}
+--- !u!1 &355051988
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 355051990}
+  - component: {fileID: 355051989}
+  m_Layer: 0
+  m_Name: Earthbender
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &355051989
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 355051988}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 744e0d1dbf44e5345b9253882ea8f67a, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::Shooter
+  chain: {fileID: 0}
+  gameCamera: {fileID: 0}
+  shotCooldown: 0.25
+  projectileSpeed: 14
+  minimumAimDistance: 0.5
+  muzzleDistance: 0.9
+  bodyColor: {r: 0.55, g: 0.4, b: 0.25, a: 1}
+  barrelColor: {r: 0.35, g: 0.25, b: 0.15, a: 1}
+--- !u!4 &355051990
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 355051988}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &519420028
 GameObject:
   m_ObjectHideFlags: 0
@@ -992,10 +1044,11 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: cdd3705999f46eb49b9c35398bfa6f6a, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::BallChain
-  path: {fileID: 0}
+  path: {fileID: 1295533770}
   ballCount: 40
   ballDiameter: 0.6
   speed: 1.2
+  catchUpSpeed: 10
   colors:
   - {r: 0.85, g: 0.27, b: 0.22, a: 1}
   - {r: 0.3, g: 0.62, b: 0.9, a: 1}
@@ -1025,3 +1078,4 @@ SceneRoots:
   - {fileID: 619394802}
   - {fileID: 1295533773}
   - {fileID: 1868445659}
+  - {fileID: 355051990}

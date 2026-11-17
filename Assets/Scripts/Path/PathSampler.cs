@@ -57,6 +57,27 @@ public Vector3 GetPosition(float distance)
         return Vector3.Lerp(points[upperIndex - 1], points[upperIndex], segmentProgress);
     }
 
+/// <summary>Distance along the path of the sample closest to a world position.</summary>
+    public float GetClosestDistance(Vector3 worldPosition)
+    {
+        if (!IsReady) return 0f;
+
+        int closestIndex = 0;
+        float closestSquaredDistance = float.MaxValue;
+        for (int sampleIndex = 0; sampleIndex < points.Length; sampleIndex++)
+        {
+            float squaredDistance = ((Vector2)(points[sampleIndex] - worldPosition)).sqrMagnitude;
+            if (squaredDistance < closestSquaredDistance)
+            {
+                closestSquaredDistance = squaredDistance;
+                closestIndex = sampleIndex;
+            }
+        }
+
+        return cumulative[closestIndex];
+    }
+
+
 void OnDrawGizmos()
     {
         var splineContainer = GetComponent<SplineContainer>();
