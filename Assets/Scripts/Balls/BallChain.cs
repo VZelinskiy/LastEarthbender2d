@@ -17,6 +17,7 @@ public class BallChain : MonoBehaviour
     [SerializeField, Min(0.1f)] float ballDiameter = 0.6f;
     [SerializeField, Min(0f)] float speed = 1.2f;
     [SerializeField, Min(0f)] float catchUpSpeed = 10f; // how fast balls slide into place after an insertion
+    [SerializeField, Min(0f)] float rollbackSpeed = 3f; // how fast the front part rolls back while a gap closes
 
     [Header("Ball types (placeholder colours until real art arrives)")]
     [SerializeField]
@@ -31,10 +32,27 @@ public class BallChain : MonoBehaviour
 
     readonly List<Ball> balls = new List<Ball>();
     float headDistance;
-    bool reachedEnd;
+    bool isFinished;
     int nextBallId;
 
+    const int MinimumGroupSize = 3;
+    const float SettledTolerance = 0.02f;
+    const float GapEpsilon = 0.001f;
+    const float PopDuration = 0.12f;
+
+    // A spot where a match should be looked for once the balls there have stopped sliding.
+    struct PendingCheck
+    {
+        public Ball Ball;
+        public bool IsSeam;      // true: a gap just closed here; false: a freshly inserted ball
+        public int ComboLevel;
+    }
+
+    readonly List<PendingCheck> pendingChecks = new List<PendingCheck>();
+
     public event Action ChainReachedEnd;
+    public event Action ChainCleared;
+    public event Action<int, int> BallsCleared; // (balls removed, combo level)
 
     public float BallDiameter => ballDiameter;
     public int TypeCount => colors.Length;
@@ -93,18 +111,22 @@ public class BallChain : MonoBehaviour
 
     void Update()
     {
-        if (reachedEnd) return;
+        if (isFinished) return;
 
-        headDistance += speed * Time.deltaTime;
+        AdvanceChain(Time.deltaTime);
+
         float maxStep = catchUpSpeed * Time.deltaTime;
+        float accumulatedGap = 0f;
 
         for (int ballIndex = 0; ballIndex < balls.Count; ballIndex++)
         {
             var ball = balls[ballIndex];
-            float targetDistance = headDistance - ballIndex * ballDiameter;
+            accumulatedGap += ball.GapAhead;
+
+            float targetDistance = headDistance - ballIndex * ballDiameter - accumulatedGap;
             ball.Distance = Mathf.MoveTowards(ball.Distance, targetDistance, maxStep);
 
-            bool isOnPath = ball.Distance >= 0f;
+            bool isOnPath = IsOnPath(ball);
             if (ball.gameObject.activeSelf != isOnPath)
                 ball.gameObject.SetActive(isOnPath);
 
@@ -112,13 +134,53 @@ public class BallChain : MonoBehaviour
                 ball.transform.position = path.GetPosition(ball.Distance);
         }
 
-        if (headDistance >= path.Length)
+        ProcessPendingChecks();
+
+        if (!isFinished && headDistance >= path.Length)
         {
-            reachedEnd = true;
+            isFinished = true;
             Debug.Log("BallChain: the head reached the end of the path (game over in the full game).");
             ChainReachedEnd?.Invoke();
         }
     }
+
+    /// <summary>
+    /// Moves the chain. Gaps split it into segments: the last segment is pushed forward at the
+    /// normal speed, and everything ahead of a gap rolls back until that gap closes.
+    /// </summary>
+    void AdvanceChain(float deltaTime)
+    {
+        int tailSegmentStart = FindTailSegmentStart();
+        if (tailSegmentStart == 0)
+        {
+            headDistance += speed * deltaTime;
+            return;
+        }
+
+        headDistance -= rollbackSpeed * deltaTime;
+
+        // The tail segment moves forward and the part ahead moves back, so the gap closes at the sum of both speeds.
+        var tailSegmentFirstBall = balls[tailSegmentStart];
+        tailSegmentFirstBall.GapAhead -= (speed + rollbackSpeed) * deltaTime;
+
+        if (tailSegmentFirstBall.GapAhead <= GapEpsilon)
+        {
+            tailSegmentFirstBall.GapAhead = 0f;
+            pendingChecks.Add(new PendingCheck { Ball = tailSegmentFirstBall, IsSeam = true, ComboLevel = tailSegmentFirstBall.SeamComboLevel });
+        }
+    }
+
+    // Index of the first ball of the last segment (0 when the chain has no gaps).
+    int FindTailSegmentStart()
+    {
+        for (int ballIndex = balls.Count - 1; ballIndex > 0; ballIndex--)
+        {
+            if (balls[ballIndex].GapAhead > GapEpsilon) return ballIndex;
+        }
+
+        return 0;
+    }
+
 
     public Color GetColor(int typeIndex)
     {
@@ -159,22 +221,182 @@ public class BallChain : MonoBehaviour
         // Landed ahead of the hit ball (towards the head) -> take its slot; otherwise go behind it.
         int insertIndex = hitPathDistance > hitBall.Distance ? hitBallIndex : hitBallIndex + 1;
 
-        headDistance += ballDiameter;
+        // Make room for the new ball: use up any gap at that spot first, push everything ahead for the rest.
+        float gapAtSlot = insertIndex < balls.Count ? balls[insertIndex].GapAhead : 0f;
+        float absorbedGap = Mathf.Min(gapAtSlot, ballDiameter);
+        headDistance += ballDiameter - absorbedGap;
+
+        if (insertIndex < balls.Count)
+        {
+            float remainingGap = gapAtSlot - absorbedGap;
+            balls[insertIndex].GapAhead = remainingGap > GapEpsilon ? remainingGap : 0f;
+        }
 
         var newBall = CreateBall(typeIndex, hitPathDistance);
         balls.Insert(insertIndex, newBall);
+
+        // Look for a match once the new ball has slid into its slot.
+        pendingChecks.Add(new PendingCheck { Ball = newBall, IsSeam = false, ComboLevel = 1 });
     }
 
     /// <summary>Picks a type that is still present in the chain, so the player never gets an impossible colour.</summary>
     public int PickShooterType()
     {
         var presentTypes = new List<int>();
-        foreach (var ball in balls)
-        {
-            if (!presentTypes.Contains(ball.Type)) presentTypes.Add(ball.Type);
-        }
+        CollectTypes(presentTypes, true);
+        if (presentTypes.Count == 0) CollectTypes(presentTypes, false);
 
         if (presentTypes.Count == 0) return UnityEngine.Random.Range(0, colors.Length);
         return presentTypes[UnityEngine.Random.Range(0, presentTypes.Count)];
     }
+
+    void CollectTypes(List<int> typeList, bool onPathOnly)
+    {
+        foreach (var ball in balls)
+        {
+            if (onPathOnly && !IsOnPath(ball)) continue;
+            if (!typeList.Contains(ball.Type)) typeList.Add(ball.Type);
+        }
+    }
+
+    float GetTargetDistance(int ballIndex)
+    {
+        float accumulatedGap = 0f;
+        for (int gapIndex = 1; gapIndex <= ballIndex; gapIndex++)
+            accumulatedGap += balls[gapIndex].GapAhead;
+
+        return headDistance - ballIndex * ballDiameter - accumulatedGap;
+    }
+
+    static bool IsOnPath(Ball ball)
+    {
+        return ball.Distance >= 0f;
+    }
+
+    int FindBallIndex(Ball searchedBall)
+    {
+        for (int ballIndex = 0; ballIndex < balls.Count; ballIndex++)
+        {
+            if (balls[ballIndex] == searchedBall) return ballIndex;
+        }
+
+        return -1;
+    }
+
+    /// <summary>Finds the run of same-type balls (already on the path) around centerIndex.</summary>
+    bool TryFindGroup(int centerIndex, out int firstIndex, out int lastIndex)
+    {
+        int typeIndex = balls[centerIndex].Type;
+        firstIndex = centerIndex;
+        lastIndex = centerIndex;
+
+        // Balls only count as a group while they actually touch (no gap between them).
+        while (firstIndex > 0
+               && balls[firstIndex].GapAhead <= GapEpsilon
+               && IsOnPath(balls[firstIndex - 1])
+               && balls[firstIndex - 1].Type == typeIndex)
+            firstIndex--;
+
+        while (lastIndex < balls.Count - 1
+               && balls[lastIndex + 1].GapAhead <= GapEpsilon
+               && IsOnPath(balls[lastIndex + 1])
+               && balls[lastIndex + 1].Type == typeIndex)
+            lastIndex++;
+
+        return lastIndex - firstIndex + 1 >= MinimumGroupSize;
+    }
+
+    void RemoveRange(int firstIndex, int lastIndex, int seamComboLevel)
+    {
+        int removedCount = lastIndex - firstIndex + 1;
+        bool hasBallBehind = lastIndex + 1 < balls.Count;
+
+        float newHeadDistance = headDistance;
+        float newGap = 0f;
+        if (hasBallBehind)
+        {
+            // The ball behind the group ends up this far from the ball ahead of the group (minus one diameter).
+            newGap = removedCount * ballDiameter;
+            for (int ballIndex = firstIndex; ballIndex <= lastIndex + 1; ballIndex++)
+                newGap += balls[ballIndex].GapAhead;
+
+            // Nothing is left ahead of the gap, so the ball behind becomes the head and must not jump forward.
+            if (firstIndex == 0)
+                newHeadDistance = GetTargetDistance(lastIndex + 1);
+        }
+
+        for (int ballIndex = firstIndex; ballIndex <= lastIndex; ballIndex++)
+            balls[ballIndex].Pop(PopDuration);
+
+        balls.RemoveRange(firstIndex, removedCount);
+        headDistance = newHeadDistance;
+
+        if (!hasBallBehind) return;
+
+        var ballBehind = balls[firstIndex];
+        if (firstIndex == 0)
+        {
+            ballBehind.GapAhead = 0f;
+            ballBehind.SeamComboLevel = 0;
+        }
+        else
+        {
+            ballBehind.GapAhead = newGap;
+            ballBehind.SeamComboLevel = seamComboLevel;
+        }
+    }
+
+    void ProcessPendingChecks()
+    {
+        int checkIndex = 0;
+        while (checkIndex < pendingChecks.Count)
+        {
+            var check = pendingChecks[checkIndex];
+            int ballIndex = FindBallIndex(check.Ball);
+
+            if (ballIndex < 0)
+            {
+                // The ball was removed by an earlier match.
+                pendingChecks.RemoveAt(checkIndex);
+                continue;
+            }
+
+            float distanceToSlot = Mathf.Abs(balls[ballIndex].Distance - GetTargetDistance(ballIndex));
+            if (distanceToSlot >= SettledTolerance)
+            {
+                checkIndex++;
+                continue;
+            }
+
+            pendingChecks.RemoveAt(checkIndex);
+            ResolveCheck(check, ballIndex);
+        }
+    }
+
+    void ResolveCheck(PendingCheck check, int ballIndex)
+    {
+        if (!IsOnPath(balls[ballIndex])) return;
+
+        if (check.IsSeam)
+        {
+            // The gap has just closed: only a match across the seam continues the combo.
+            if (ballIndex == 0 || balls[ballIndex - 1].Type != balls[ballIndex].Type) return;
+        }
+
+        int firstIndex;
+        int lastIndex;
+        if (!TryFindGroup(ballIndex, out firstIndex, out lastIndex)) return;
+
+        int removedCount = lastIndex - firstIndex + 1;
+        RemoveRange(firstIndex, lastIndex, check.ComboLevel + 1);
+        Debug.Log($"BallChain: cleared {removedCount} balls (combo x{check.ComboLevel})");
+        BallsCleared?.Invoke(removedCount, check.ComboLevel);
+
+        if (balls.Count == 0)
+        {
+            isFinished = true;
+            ChainCleared?.Invoke();
+        }
+    }
+
 }
