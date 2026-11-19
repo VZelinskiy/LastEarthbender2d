@@ -58,14 +58,21 @@ public Vector3 GetPosition(float distance)
     }
 
 /// <summary>Distance along the path of the sample closest to a world position.</summary>
-    public float GetClosestDistance(Vector3 worldPosition)
+    /// <summary>
+    /// Distance along the path of the sample closest to a world position, looking only within
+    /// searchRadius of nearDistance. The limit keeps the result on the same turn of the path;
+    /// a search over the whole path can jump to a neighbouring turn of a tight spiral.
+    /// </summary>
+    public float GetClosestDistance(Vector3 worldPosition, float nearDistance, float searchRadius)
     {
         if (!IsReady) return 0f;
 
-        int closestIndex = 0;
+        int closestIndex = -1;
         float closestSquaredDistance = float.MaxValue;
         for (int sampleIndex = 0; sampleIndex < points.Length; sampleIndex++)
         {
+            if (Mathf.Abs(cumulative[sampleIndex] - nearDistance) > searchRadius) continue;
+
             float squaredDistance = ((Vector2)(points[sampleIndex] - worldPosition)).sqrMagnitude;
             if (squaredDistance < closestSquaredDistance)
             {
@@ -74,6 +81,7 @@ public Vector3 GetPosition(float distance)
             }
         }
 
+        if (closestIndex < 0) return Mathf.Clamp(nearDistance, 0f, Length);
         return cumulative[closestIndex];
     }
 

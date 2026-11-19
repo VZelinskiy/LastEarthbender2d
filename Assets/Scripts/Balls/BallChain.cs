@@ -13,9 +13,9 @@ public class BallChain : MonoBehaviour
     [SerializeField] PathSampler path;
 
     [Header("Chain")]
-    [SerializeField, Min(1)] int ballCount = 40;
+    int ballCount; // set by BeginLevel
     [SerializeField, Min(0.1f)] float ballDiameter = 0.6f;
-    [SerializeField, Min(0f)] float speed = 1.2f;
+    float speed; // set by BeginLevel
     [SerializeField, Min(0f)] float catchUpSpeed = 10f; // how fast balls slide into place after an insertion
     [SerializeField, Min(0f)] float rollbackSpeed = 3f; // how fast the front part rolls back while a gap closes
 
@@ -34,6 +34,7 @@ public class BallChain : MonoBehaviour
     float headDistance;
     bool isFinished;
     int nextBallId;
+    int activeTypeCount; // how many of the colours this level uses
 
     const int MinimumGroupSize = 3;
     const float SettledTolerance = 0.02f;
@@ -55,7 +56,9 @@ public class BallChain : MonoBehaviour
     public event Action<int, int> BallsCleared; // (balls removed, combo level)
 
     public float BallDiameter => ballDiameter;
-    public int TypeCount => colors.Length;
+    public int TypeCount => activeTypeCount;
+    public int BallsRemaining => balls.Count;
+    public bool IsFinished => isFinished;
     public IReadOnlyList<Ball> Balls => balls;
 
     void Start()
@@ -68,8 +71,34 @@ public class BallChain : MonoBehaviour
             return;
         }
 
+        if (activeTypeCount == 0) activeTypeCount = colors.Length;
+    }
+
+    /// <summary>Clears the chain and spawns a fresh one for a level.</summary>
+    public void BeginLevel(int newBallCount, int newTypeCount, float newChainSpeed)
+    {
+        if (path == null) path = FindAnyObjectByType<PathSampler>();
+
+        ClearAll();
+        ballCount = newBallCount;
+        activeTypeCount = Mathf.Clamp(newTypeCount, 1, colors.Length);
+        speed = newChainSpeed;
+        headDistance = 0f;
+        nextBallId = 0;
+        isFinished = false;
+
         Spawn();
     }
+
+    void ClearAll()
+    {
+        for (int childIndex = transform.childCount - 1; childIndex >= 0; childIndex--)
+            Destroy(transform.GetChild(childIndex).gameObject);
+
+        balls.Clear();
+        pendingChecks.Clear();
+    }
+
 
     void Spawn()
     {
@@ -90,7 +119,7 @@ public class BallChain : MonoBehaviour
         int attempts = 0;
         do
         {
-            typeIndex = UnityEngine.Random.Range(0, colors.Length);
+            typeIndex = UnityEngine.Random.Range(0, activeTypeCount);
             attempts++;
         }
         while (ballIndex >= 2 && balls[ballIndex - 1].Type == typeIndex && balls[ballIndex - 2].Type == typeIndex && attempts < 20);
@@ -216,7 +245,7 @@ public class BallChain : MonoBehaviour
     public void InsertBall(int typeIndex, Vector3 hitPosition, int hitBallIndex)
     {
         var hitBall = balls[hitBallIndex];
-        float hitPathDistance = path.GetClosestDistance(hitPosition);
+        float hitPathDistance = path.GetClosestDistance(hitPosition, hitBall.Distance, ballDiameter * 1.5f);
 
         // Landed ahead of the hit ball (towards the head) -> take its slot; otherwise go behind it.
         int insertIndex = hitPathDistance > hitBall.Distance ? hitBallIndex : hitBallIndex + 1;
@@ -246,7 +275,7 @@ public class BallChain : MonoBehaviour
         CollectTypes(presentTypes, true);
         if (presentTypes.Count == 0) CollectTypes(presentTypes, false);
 
-        if (presentTypes.Count == 0) return UnityEngine.Random.Range(0, colors.Length);
+        if (presentTypes.Count == 0) return UnityEngine.Random.Range(0, activeTypeCount);
         return presentTypes[UnityEngine.Random.Range(0, presentTypes.Count)];
     }
 

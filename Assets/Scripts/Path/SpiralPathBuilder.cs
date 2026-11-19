@@ -40,4 +40,14 @@ public class SpiralPathBuilder : MonoBehaviour
             spline.Add(new BezierKnot(knotPosition), TangentMode.AutoSmooth);
         }
     }
+
+    /// <summary>Changes the spiral shape (used when a level loads) and rebuilds the spline.</summary>
+    public void Configure(int newTurns, float newStartRadius, float newEndRadius)
+    {
+        turns = Mathf.Max(1, newTurns);
+        startRadius = newStartRadius;
+        endRadius = newEndRadius;
+        Build();
+    }
+
 }

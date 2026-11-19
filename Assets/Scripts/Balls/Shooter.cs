@@ -28,6 +28,9 @@ public class Shooter : MonoBehaviour
     int nextType;
     float cooldownTimer;
 
+    /// <summary>Set to false to stop aiming and shooting (game over, menus).</summary>
+    public bool InputEnabled { get; set; } = true;
+
     void Start()
     {
         if (chain == null) chain = FindAnyObjectByType<BallChain>();
@@ -49,6 +52,8 @@ public class Shooter : MonoBehaviour
 
     void Update()
     {
+        if (!InputEnabled) return;
+
         cooldownTimer -= Time.deltaTime;
 
         var pointer = Pointer.current;
@@ -80,6 +85,18 @@ public class Shooter : MonoBehaviour
 
         cooldownTimer = shotCooldown;
     }
+
+    /// <summary>Loads fresh balls, e.g. when a new level starts.</summary>
+    public void ResetShooter()
+    {
+        if (loadedBallRenderer == null) return; // the visuals are built in Start
+
+        loadedType = chain.PickShooterType();
+        nextType = chain.PickShooterType();
+        RefreshBallVisuals();
+        cooldownTimer = 0f;
+    }
+
 
     void RefreshBallVisuals()
     {

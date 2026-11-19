@@ -412,6 +412,67 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &1213401630
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1213401633}
+  - component: {fileID: 1213401632}
+  - component: {fileID: 1213401631}
+  m_Layer: 0
+  m_Name: GameManager
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &1213401631
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1213401630}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 8a29a1ecaea95ad4fa9111be26f261bb, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::GameUI
+--- !u!114 &1213401632
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1213401630}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f88cefee576ce0f4fa1cd470038633bc, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::LevelController
+  levels:
+  - {fileID: 11400000, guid: cc106a4a357a27141bac460d5178e3b4, type: 2}
+  - {fileID: 11400000, guid: 3f0e7cb039c3ecd4984c2600cb5c5df9, type: 2}
+  - {fileID: 11400000, guid: 141551b78aca41f498a4e657f985e3a3, type: 2}
+--- !u!4 &1213401633
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1213401630}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1295533769
 GameObject:
   m_ObjectHideFlags: 0
@@ -1045,10 +1106,9 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::BallChain
   path: {fileID: 1295533770}
-  ballCount: 40
   ballDiameter: 0.6
-  speed: 1.2
   catchUpSpeed: 10
+  rollbackSpeed: 3
   colors:
   - {r: 0.85, g: 0.27, b: 0.22, a: 1}
   - {r: 0.3, g: 0.62, b: 0.9, a: 1}
@@ -1079,3 +1139,4 @@ SceneRoots:
   - {fileID: 1295533773}
   - {fileID: 1868445659}
   - {fileID: 355051990}
+  - {fileID: 1213401633}
