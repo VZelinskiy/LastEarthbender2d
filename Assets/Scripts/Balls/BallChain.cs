@@ -19,6 +19,13 @@ public class BallChain : MonoBehaviour
     [SerializeField, Min(0f)] float catchUpSpeed = 10f; // how fast balls slide into place after an insertion
     [SerializeField, Min(0f)] float rollbackSpeed = 3f; // how fast the front part rolls back while a gap closes
 
+    [Header("Bonuses")]
+    [SerializeField, Min(0f)] float slowDuration = 6f;
+    [SerializeField, Range(0.05f, 1f)] float slowFactor = 0.4f; // chain speed multiplier while slowed
+    [SerializeField, Min(0f)] float reverseDuration = 3f;
+    [SerializeField, Min(0f)] float reverseSpeed = 2f; // kept below rollbackSpeed so gaps still close
+    [SerializeField, Min(0)] int bombRadiusInBalls = 2;
+
     [Header("Ball types (placeholder colours until real art arrives)")]
     [SerializeField]
     Color[] colors =
@@ -35,10 +42,14 @@ public class BallChain : MonoBehaviour
     bool isFinished;
     int nextBallId;
     int activeTypeCount; // how many of the colours this level uses
+    float bonusChance;
+    float slowTimer;
+    float reverseTimer;
 
     const int MinimumGroupSize = 3;
     const float SettledTolerance = 0.02f;
     const float GapEpsilon = 0.001f;
+    const int MinimumBallsBeforeBonus = 4;
     const float PopDuration = 0.12f;
 
     // A spot where a match should be looked for once the balls there have stopped sliding.
@@ -54,11 +65,14 @@ public class BallChain : MonoBehaviour
     public event Action ChainReachedEnd;
     public event Action ChainCleared;
     public event Action<int, int> BallsCleared; // (balls removed, combo level)
+    public event Action<BallKind> BonusTriggered;
 
     public float BallDiameter => ballDiameter;
     public int TypeCount => activeTypeCount;
     public int BallsRemaining => balls.Count;
     public bool IsFinished => isFinished;
+    public float SlowRemaining => slowTimer;
+    public float ReverseRemaining => reverseTimer;
     public IReadOnlyList<Ball> Balls => balls;
 
     void Start()
@@ -75,7 +89,7 @@ public class BallChain : MonoBehaviour
     }
 
     /// <summary>Clears the chain and spawns a fresh one for a level.</summary>
-    public void BeginLevel(int newBallCount, int newTypeCount, float newChainSpeed)
+    public void BeginLevel(int newBallCount, int newTypeCount, float newChainSpeed, float newBonusChance)
     {
         if (path == null) path = FindAnyObjectByType<PathSampler>();
 
@@ -83,6 +97,9 @@ public class BallChain : MonoBehaviour
         ballCount = newBallCount;
         activeTypeCount = Mathf.Clamp(newTypeCount, 1, colors.Length);
         speed = newChainSpeed;
+        bonusChance = newBonusChance;
+        slowTimer = 0f;
+        reverseTimer = 0f;
         headDistance = 0f;
         nextBallId = 0;
         isFinished = false;
@@ -106,6 +123,10 @@ public class BallChain : MonoBehaviour
         {
             int typeIndex = PickType();
             var ball = CreateBall(typeIndex, headDistance - ballIndex * ballDiameter);
+
+            if (ballIndex >= MinimumBallsBeforeBonus && UnityEngine.Random.value < bonusChance)
+                ball.SetKind(PickBonusKind());
+
             ball.gameObject.SetActive(false); // hidden until it enters the path
             balls.Add(ball);
         }
@@ -141,6 +162,9 @@ public class BallChain : MonoBehaviour
     void Update()
     {
         if (isFinished) return;
+
+        slowTimer = Mathf.Max(0f, slowTimer - Time.deltaTime);
+        reverseTimer = Mathf.Max(0f, reverseTimer - Time.deltaTime);
 
         AdvanceChain(Time.deltaTime);
 
@@ -179,18 +203,20 @@ public class BallChain : MonoBehaviour
     /// </summary>
     void AdvanceChain(float deltaTime)
     {
+        float tailVelocity = GetTailVelocity();
+
         int tailSegmentStart = FindTailSegmentStart();
         if (tailSegmentStart == 0)
         {
-            headDistance += speed * deltaTime;
+            headDistance += tailVelocity * deltaTime;
             return;
         }
 
         headDistance -= rollbackSpeed * deltaTime;
 
-        // The tail segment moves forward and the part ahead moves back, so the gap closes at the sum of both speeds.
+        // The tail segment moves at tailVelocity and the part ahead rolls back, so the gap closes at the sum of both.
         var tailSegmentFirstBall = balls[tailSegmentStart];
-        tailSegmentFirstBall.GapAhead -= (speed + rollbackSpeed) * deltaTime;
+        tailSegmentFirstBall.GapAhead -= (rollbackSpeed + tailVelocity) * deltaTime;
 
         if (tailSegmentFirstBall.GapAhead <= GapEpsilon)
         {
@@ -416,10 +442,44 @@ public class BallChain : MonoBehaviour
         int lastIndex;
         if (!TryFindGroup(ballIndex, out firstIndex, out lastIndex)) return;
 
+        ClearRange(firstIndex, lastIndex, check.ComboLevel);
+    }
+
+    /// <summary>
+    /// Removes a run of balls, then triggers the bonuses they carried. A bomb among them
+    /// widens the cleared run by bombRadiusInBalls on each side.
+    /// </summary>
+    void ClearRange(int firstIndex, int lastIndex, int comboLevel)
+    {
+        bool hasBomb = false;
+        for (int ballIndex = firstIndex; ballIndex <= lastIndex; ballIndex++)
+        {
+            if (balls[ballIndex].Kind == BallKind.Bomb) hasBomb = true;
+        }
+
+        if (hasBomb)
+        {
+            firstIndex = Mathf.Max(0, firstIndex - bombRadiusInBalls);
+            lastIndex = Mathf.Min(balls.Count - 1, lastIndex + bombRadiusInBalls);
+
+            // Balls that have not entered the path yet are not part of the explosion.
+            while (lastIndex > firstIndex && !IsOnPath(balls[lastIndex])) lastIndex--;
+        }
+
+        var triggeredKinds = new List<BallKind>();
+        for (int ballIndex = firstIndex; ballIndex <= lastIndex; ballIndex++)
+        {
+            BallKind kind = balls[ballIndex].Kind;
+            if (kind != BallKind.Normal && !triggeredKinds.Contains(kind)) triggeredKinds.Add(kind);
+        }
+
         int removedCount = lastIndex - firstIndex + 1;
-        RemoveRange(firstIndex, lastIndex, check.ComboLevel + 1);
-        Debug.Log($"BallChain: cleared {removedCount} balls (combo x{check.ComboLevel})");
-        BallsCleared?.Invoke(removedCount, check.ComboLevel);
+        RemoveRange(firstIndex, lastIndex, comboLevel + 1);
+        Debug.Log($"BallChain: cleared {removedCount} balls (combo x{comboLevel})");
+        BallsCleared?.Invoke(removedCount, comboLevel);
+
+        foreach (BallKind kind in triggeredKinds)
+            ApplyBonus(kind);
 
         if (balls.Count == 0)
         {
@@ -427,5 +487,46 @@ public class BallChain : MonoBehaviour
             ChainCleared?.Invoke();
         }
     }
+
+    /// <summary>Earth Strike: clears the hit ball and its neighbours, whatever their colours.</summary>
+    public void StrikeAround(int hitBallIndex, int radiusInBalls)
+    {
+        if (hitBallIndex < 0 || hitBallIndex >= balls.Count) return;
+
+        int firstIndex = Mathf.Max(0, hitBallIndex - radiusInBalls);
+        int lastIndex = Mathf.Min(balls.Count - 1, hitBallIndex + radiusInBalls);
+        while (lastIndex > hitBallIndex && !IsOnPath(balls[lastIndex])) lastIndex--;
+
+        ClearRange(firstIndex, lastIndex, 1);
+    }
+
+    void ApplyBonus(BallKind kind)
+    {
+        switch (kind)
+        {
+            case BallKind.Slow:
+                slowTimer = slowDuration;
+                break;
+            case BallKind.Reverse:
+                reverseTimer = reverseDuration;
+                break;
+        }
+
+        Debug.Log($"BallChain: bonus {kind} triggered");
+        BonusTriggered?.Invoke(kind);
+    }
+
+    // Speed of the last segment: normal, slowed, or negative while the chain is reversing.
+    float GetTailVelocity()
+    {
+        if (reverseTimer > 0f) return -Mathf.Min(reverseSpeed, rollbackSpeed * 0.9f);
+        return slowTimer > 0f ? speed * slowFactor : speed;
+    }
+
+    static BallKind PickBonusKind()
+    {
+        return (BallKind)UnityEngine.Random.Range(1, 5);
+    }
+
 
 }

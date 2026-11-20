@@ -4,6 +4,8 @@ using UnityEngine;
 public class Ball : MonoBehaviour
 {
     SpriteRenderer spriteRenderer;
+    const float LabelCharacterSize = 0.07f;
+
     bool isPopping;
     float popTimer;
     float popDuration;
@@ -21,6 +23,9 @@ public class Ball : MonoBehaviour
     /// <summary>Combo level to use when the gap ahead of this ball closes and the seam is checked.</summary>
     public int SeamComboLevel { get; set; }
 
+    /// <summary>The special power this ball carries (Normal for most balls).</summary>
+    public BallKind Kind { get; private set; }
+
     public void Init(int type, Color color, float diameter)
     {
         if (spriteRenderer == null) spriteRenderer = GetComponent<SpriteRenderer>();
@@ -30,6 +35,45 @@ public class Ball : MonoBehaviour
         spriteRenderer.color = color;
         transform.localScale = Vector3.one * diameter;
     }
+
+    /// <summary>Gives the ball a power and a letter on it so the player can tell it apart.</summary>
+    public void SetKind(BallKind newKind)
+    {
+        Kind = newKind;
+        if (newKind == BallKind.Normal) return;
+
+        var font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+
+        var labelObject = new GameObject("BonusLabel");
+        labelObject.transform.SetParent(transform, false);
+        labelObject.transform.localPosition = new Vector3(0f, 0f, -0.01f);
+
+        var textMesh = labelObject.AddComponent<TextMesh>();
+        textMesh.font = font;
+        textMesh.text = GetKindLetter(newKind);
+        textMesh.anchor = TextAnchor.MiddleCenter;
+        textMesh.alignment = TextAlignment.Center;
+        textMesh.characterSize = LabelCharacterSize;
+        textMesh.fontSize = 64;
+        textMesh.color = new Color(0.1f, 0.07f, 0.04f);
+
+        var meshRenderer = labelObject.GetComponent<MeshRenderer>();
+        meshRenderer.sharedMaterial = font.material;
+        meshRenderer.sortingOrder = 1;
+    }
+
+    static string GetKindLetter(BallKind kind)
+    {
+        switch (kind)
+        {
+            case BallKind.Slow: return "S";
+            case BallKind.Reverse: return "R";
+            case BallKind.Bomb: return "B";
+            case BallKind.Aim: return "A";
+            default: return "";
+        }
+    }
+
 
 void Awake()
     {

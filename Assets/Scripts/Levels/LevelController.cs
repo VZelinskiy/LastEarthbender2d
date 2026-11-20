@@ -64,12 +64,12 @@ public class LevelController : MonoBehaviour
         levelIndex = Mathf.Clamp(index, 0, levels.Length - 1);
         var level = levels[levelIndex];
 
-        foreach (var projectile in FindObjectsByType<Projectile>(FindObjectsSortMode.None))
+        foreach (var projectile in FindObjectsByType<Projectile>())
             Destroy(projectile.gameObject);
 
         pathBuilder.Configure(level.SpiralTurns, level.SpiralStartRadius, level.SpiralEndRadius);
         pathSampler.Rebuild();
-        chain.BeginLevel(level.BallCount, level.BallTypeCount, level.ChainSpeed);
+        chain.BeginLevel(level.BallCount, level.BallTypeCount, level.ChainSpeed, level.BonusChance);
         shooter.ResetShooter();
 
         SetState(GameState.Playing);

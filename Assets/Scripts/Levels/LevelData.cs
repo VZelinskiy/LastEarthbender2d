@@ -13,6 +13,7 @@ public class LevelData : ScriptableObject
     [SerializeField, Min(1)] int ballCount = 30;
     [SerializeField, Range(2, 5)] int ballTypeCount = 3;
     [SerializeField, Min(0.1f)] float chainSpeed = 1f;
+    [SerializeField, Range(0f, 0.3f)] float bonusChance = 0.06f; // chance that a ball carries a bonus
 
     [Header("Spiral path")]
     [SerializeField, Min(1)] int spiralTurns = 3;
@@ -23,6 +24,7 @@ public class LevelData : ScriptableObject
     public int BallCount => ballCount;
     public int BallTypeCount => ballTypeCount;
     public float ChainSpeed => chainSpeed;
+    public float BonusChance => bonusChance;
     public int SpiralTurns => spiralTurns;
     public float SpiralStartRadius => spiralStartRadius;
     public float SpiralEndRadius => spiralEndRadius;

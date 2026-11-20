@@ -16,6 +16,7 @@ MonoBehaviour:
   ballCount: 30
   ballTypeCount: 3
   chainSpeed: 0.8
+  bonusChance: 0.05
   spiralTurns: 3
   spiralStartRadius: 4.5
   spiralEndRadius: 1.2

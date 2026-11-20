@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.InputSystem;
 
@@ -16,6 +17,14 @@ public class Shooter : MonoBehaviour
     [SerializeField, Min(0.1f)] float projectileSpeed = 14f;
     [SerializeField, Min(0f)] float minimumAimDistance = 0.5f;
 
+    [Header("Earth Strike ability")]
+    [SerializeField, Min(0f)] float strikeCooldown = 12f;
+    [SerializeField, Min(0)] int strikeRadiusInBalls = 2;
+    [SerializeField, Min(1f)] float strikeSpeedMultiplier = 1.3f;
+
+    [Header("Aim guide (Aim bonus)")]
+    [SerializeField, Min(0f)] float aimGuideDuration = 8f;
+
     [Header("Placeholder look")]
     [SerializeField] float muzzleDistance = 0.9f;
     [SerializeField] Color bodyColor = new Color(0.55f, 0.40f, 0.25f);
@@ -31,6 +40,23 @@ public class Shooter : MonoBehaviour
     /// <summary>Set to false to stop aiming and shooting (game over, menus).</summary>
     public bool InputEnabled { get; set; } = true;
 
+    /// <summary>Lets the UI claim a screen position (e.g. over a button) so it does not fire a ball.</summary>
+    public System.Predicate<Vector2> IsPointerBlocked { get; set; }
+
+    public float StrikeCooldownRemaining => strikeTimer;
+    public float StrikeCooldownDuration => strikeCooldown;
+    public float AimGuideRemaining => guideTimer;
+
+    const float GuideMaxLength = 14f;
+    const float GuideStep = 0.1f;
+    const float GuideDotSpacing = 0.5f;
+    const int GuideDotCount = 28;
+
+    float strikeTimer;
+    float guideTimer;
+    Vector2 lastAimDirection = Vector2.up;
+    readonly List<SpriteRenderer> guideDots = new List<SpriteRenderer>();
+
     void Start()
     {
         if (chain == null) chain = FindAnyObjectByType<BallChain>();
@@ -44,6 +70,8 @@ public class Shooter : MonoBehaviour
         }
 
         BuildPlaceholderVisuals();
+        BuildGuideDots();
+        chain.BonusTriggered += OnBonusTriggered;
 
         loadedType = chain.PickShooterType();
         nextType = chain.PickShooterType();
@@ -52,9 +80,15 @@ public class Shooter : MonoBehaviour
 
     void Update()
     {
-        if (!InputEnabled) return;
+        if (!InputEnabled)
+        {
+            HideGuide();
+            return;
+        }
 
         cooldownTimer -= Time.deltaTime;
+        strikeTimer = Mathf.Max(0f, strikeTimer - Time.deltaTime);
+        guideTimer = Mathf.Max(0f, guideTimer - Time.deltaTime);
 
         var pointer = Pointer.current;
         if (pointer == null) return;
@@ -62,13 +96,24 @@ public class Shooter : MonoBehaviour
         Vector2 screenPosition = pointer.position.ReadValue();
         Vector3 worldPosition = gameCamera.ScreenToWorldPoint(screenPosition);
         Vector2 aimVector = (Vector2)worldPosition - (Vector2)transform.position;
-        if (aimVector.magnitude < minimumAimDistance) return;
+        bool aimIsValid = aimVector.magnitude >= minimumAimDistance;
 
-        float aimAngleDegrees = Mathf.Atan2(aimVector.y, aimVector.x) * Mathf.Rad2Deg;
-        aimPivot.rotation = Quaternion.Euler(0f, 0f, aimAngleDegrees - 90f);
+        if (aimIsValid)
+        {
+            float aimAngleDegrees = Mathf.Atan2(aimVector.y, aimVector.x) * Mathf.Rad2Deg;
+            aimPivot.rotation = Quaternion.Euler(0f, 0f, aimAngleDegrees - 90f);
+            lastAimDirection = aimVector.normalized;
+        }
 
-        if (pointer.press.wasPressedThisFrame && cooldownTimer <= 0f)
-            Fire(aimVector.normalized);
+        UpdateAimGuide();
+
+        bool pointerIsBlocked = IsPointerBlocked != null && IsPointerBlocked(screenPosition);
+        if (aimIsValid && !pointerIsBlocked && cooldownTimer <= 0f && WasPrimaryPressed(pointer))
+            Fire(lastAimDirection);
+
+        bool strikePressed = (Keyboard.current != null && Keyboard.current.spaceKey.wasPressedThisFrame)
+                             || (Mouse.current != null && Mouse.current.rightButton.wasPressedThisFrame);
+        if (strikePressed) TryUseEarthStrike();
     }
 
     void Fire(Vector2 direction)
@@ -95,7 +140,94 @@ public class Shooter : MonoBehaviour
         nextType = chain.PickShooterType();
         RefreshBallVisuals();
         cooldownTimer = 0f;
+        strikeTimer = 0f;
+        guideTimer = 0f;
+        HideGuide();
     }
+
+    void OnDestroy()
+    {
+        if (chain != null) chain.BonusTriggered -= OnBonusTriggered;
+    }
+
+    void OnBonusTriggered(BallKind kind)
+    {
+        if (kind == BallKind.Aim) guideTimer = aimGuideDuration;
+    }
+
+    /// <summary>Fires the heavy stone that clears several balls around the hit. Returns false while on cooldown.</summary>
+    public bool TryUseEarthStrike()
+    {
+        if (!InputEnabled || strikeTimer > 0f || loadedBallRenderer == null) return false;
+
+        var strikeObject = new GameObject("EarthStrike");
+        strikeObject.transform.position = loadedBallRenderer.transform.position;
+
+        var projectile = strikeObject.AddComponent<Projectile>();
+        projectile.LaunchStrike(chain, lastAimDirection, projectileSpeed * strikeSpeedMultiplier, strikeRadiusInBalls);
+
+        strikeTimer = strikeCooldown;
+        return true;
+    }
+
+    static bool WasPrimaryPressed(Pointer pointer)
+    {
+        // For a mouse only the left button shoots; the right button belongs to the Earth Strike.
+        if (pointer is Mouse mouse) return mouse.leftButton.wasPressedThisFrame;
+        return pointer.press.wasPressedThisFrame;
+    }
+
+    // Dotted line from the muzzle to the first ball the shot would hit.
+    void UpdateAimGuide()
+    {
+        if (guideTimer <= 0f)
+        {
+            HideGuide();
+            return;
+        }
+
+        Vector3 origin = loadedBallRenderer.transform.position;
+        Vector3 direction = new Vector3(lastAimDirection.x, lastAimDirection.y, 0f);
+
+        float hitDistance = GuideMaxLength;
+        for (float travelled = 0f; travelled < GuideMaxLength; travelled += GuideStep)
+        {
+            int ignoredBallIndex;
+            if (chain.TryFindHit(origin + direction * travelled, chain.BallDiameter * 0.85f, out ignoredBallIndex))
+            {
+                hitDistance = travelled;
+                break;
+            }
+        }
+
+        int visibleDotCount = Mathf.Min(guideDots.Count, Mathf.FloorToInt(hitDistance / GuideDotSpacing));
+        for (int dotIndex = 0; dotIndex < guideDots.Count; dotIndex++)
+        {
+            bool isUsed = dotIndex < visibleDotCount;
+            guideDots[dotIndex].gameObject.SetActive(isUsed);
+            if (isUsed)
+                guideDots[dotIndex].transform.position = origin + direction * ((dotIndex + 1) * GuideDotSpacing);
+        }
+    }
+
+    void HideGuide()
+    {
+        foreach (var guideDot in guideDots)
+        {
+            if (guideDot.gameObject.activeSelf) guideDot.gameObject.SetActive(false);
+        }
+    }
+
+    void BuildGuideDots()
+    {
+        for (int dotIndex = 0; dotIndex < GuideDotCount; dotIndex++)
+        {
+            var guideDot = CreateVisual("GuideDot", transform, PlaceholderSprites.Circle, new Color(1f, 1f, 1f, 0.7f), Vector3.zero, Vector3.one * 0.14f, 4);
+            guideDot.gameObject.SetActive(false);
+            guideDots.Add(guideDot);
+        }
+    }
+
 
 
     void RefreshBallVisuals()

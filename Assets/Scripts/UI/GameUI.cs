@@ -20,13 +20,26 @@ public class GameUI : MonoBehaviour
 
     int shownBallsRemaining = -1;
     int shownLevelNumber = -1;
+    int shownSlowSeconds = -1;
+    int shownReverseSeconds = -1;
+    int shownAimSeconds = -1;
+    int shownStrikeSeconds = -1;
+
+    Shooter shooter;
+    BallChain chain;
+    RectTransform abilityRect;
+    Image abilityCooldownOverlay;
+    Text abilityLabel;
 
     void Start()
     {
         controller = FindAnyObjectByType<LevelController>();
-        if (controller == null || !controller.enabled)
+        shooter = FindAnyObjectByType<Shooter>();
+        chain = FindAnyObjectByType<BallChain>();
+
+        if (controller == null || !controller.enabled || shooter == null || chain == null)
         {
-            Debug.LogError("GameUI: needs a working LevelController in the scene.", this);
+            Debug.LogError("GameUI: needs a working LevelController, Shooter and BallChain in the scene.", this);
             enabled = false;
             return;
         }
@@ -36,8 +49,10 @@ public class GameUI : MonoBehaviour
         EnsureEventSystem();
         var canvas = CreateCanvas();
         BuildHud(canvas.transform);
-        BuildOverlay(canvas.transform);
+        BuildAbilityButton(canvas.transform);
+        BuildOverlay(canvas.transform); // built last so it covers everything
 
+        shooter.IsPointerBlocked = IsOverAbilityButton;
         controller.StateChanged += OnStateChanged;
         OnStateChanged(controller.State);
     }
@@ -45,17 +60,40 @@ public class GameUI : MonoBehaviour
     void OnDestroy()
     {
         if (controller != null) controller.StateChanged -= OnStateChanged;
+        if (shooter != null) shooter.IsPointerBlocked = null;
     }
 
     void Update()
     {
         int ballsRemaining = controller.BallsRemaining;
         int levelNumber = controller.LevelNumber;
-        if (ballsRemaining == shownBallsRemaining && levelNumber == shownLevelNumber) return;
+        int slowSeconds = Mathf.CeilToInt(chain.SlowRemaining);
+        int reverseSeconds = Mathf.CeilToInt(chain.ReverseRemaining);
+        int aimSeconds = Mathf.CeilToInt(shooter.AimGuideRemaining);
 
-        shownBallsRemaining = ballsRemaining;
-        shownLevelNumber = levelNumber;
-        hudText.text = $"{controller.CurrentLevelName}  ({levelNumber}/{controller.LevelCount})\nBalls left: {ballsRemaining}";
+        bool hudChanged = ballsRemaining != shownBallsRemaining
+                          || levelNumber != shownLevelNumber
+                          || slowSeconds != shownSlowSeconds
+                          || reverseSeconds != shownReverseSeconds
+                          || aimSeconds != shownAimSeconds;
+
+        if (hudChanged)
+        {
+            shownBallsRemaining = ballsRemaining;
+            shownLevelNumber = levelNumber;
+            shownSlowSeconds = slowSeconds;
+            shownReverseSeconds = reverseSeconds;
+            shownAimSeconds = aimSeconds;
+
+            string effects = "";
+            if (slowSeconds > 0) effects += $"Slow {slowSeconds}s   ";
+            if (reverseSeconds > 0) effects += $"Reverse {reverseSeconds}s   ";
+            if (aimSeconds > 0) effects += $"Aim {aimSeconds}s";
+
+            hudText.text = $"{controller.CurrentLevelName}  ({levelNumber}/{controller.LevelCount})\nBalls left: {ballsRemaining}\n{effects}";
+        }
+
+        UpdateAbilityButton();
     }
 
     void OnStateChanged(GameState state)
@@ -119,9 +157,79 @@ public class GameUI : MonoBehaviour
         rect.anchorMax = new Vector2(0f, 1f);
         rect.pivot = new Vector2(0f, 1f);
         rect.anchoredPosition = new Vector2(24f, -18f);
-        rect.sizeDelta = new Vector2(700f, 100f);
+        rect.sizeDelta = new Vector2(700f, 130f);
         hudText.gameObject.AddComponent<Shadow>();
     }
+
+    void BuildAbilityButton(Transform parent)
+    {
+        var buttonObject = new GameObject("AbilityButton");
+        buttonObject.transform.SetParent(parent, false);
+
+        var buttonImage = buttonObject.AddComponent<Image>();
+        buttonImage.color = new Color(0.55f, 0.40f, 0.22f);
+        abilityRect = buttonImage.rectTransform;
+        abilityRect.anchorMin = new Vector2(1f, 0f);
+        abilityRect.anchorMax = new Vector2(1f, 0f);
+        abilityRect.pivot = new Vector2(1f, 0f);
+        abilityRect.anchoredPosition = new Vector2(-24f, 24f);
+        abilityRect.sizeDelta = new Vector2(280f, 84f);
+
+        var button = buttonObject.AddComponent<Button>();
+        button.targetGraphic = buttonImage;
+        button.onClick.AddListener(OnAbilityClicked);
+
+        // A dark layer that shrinks as the cooldown runs out.
+        var overlayObject = new GameObject("CooldownOverlay");
+        overlayObject.transform.SetParent(buttonObject.transform, false);
+        abilityCooldownOverlay = overlayObject.AddComponent<Image>();
+        abilityCooldownOverlay.sprite = PlaceholderSprites.Square;
+        abilityCooldownOverlay.color = new Color(0f, 0f, 0f, 0.55f);
+        abilityCooldownOverlay.type = Image.Type.Filled;
+        abilityCooldownOverlay.fillMethod = Image.FillMethod.Horizontal;
+        abilityCooldownOverlay.fillOrigin = (int)Image.OriginHorizontal.Right;
+        abilityCooldownOverlay.fillAmount = 0f;
+        abilityCooldownOverlay.raycastTarget = false;
+        StretchToParent(abilityCooldownOverlay.rectTransform);
+
+        abilityLabel = CreateText("Label", buttonObject.transform, 28, TextAnchor.MiddleCenter, Color.white);
+        StretchToParent(abilityLabel.rectTransform);
+        abilityLabel.text = "Earth Strike\n(Space)";
+    }
+
+    void OnAbilityClicked()
+    {
+        shooter.TryUseEarthStrike();
+    }
+
+    bool IsOverAbilityButton(Vector2 screenPoint)
+    {
+        return abilityRect != null
+               && abilityRect.gameObject.activeInHierarchy
+               && RectTransformUtility.RectangleContainsScreenPoint(abilityRect, screenPoint, null);
+    }
+
+    void UpdateAbilityButton()
+    {
+        float remaining = shooter.StrikeCooldownRemaining;
+        float duration = shooter.StrikeCooldownDuration;
+        abilityCooldownOverlay.fillAmount = duration > 0f ? remaining / duration : 0f;
+
+        int remainingSeconds = Mathf.CeilToInt(remaining);
+        if (remainingSeconds == shownStrikeSeconds) return;
+
+        shownStrikeSeconds = remainingSeconds;
+        abilityLabel.text = remainingSeconds > 0 ? $"Earth Strike\n{remainingSeconds}s" : "Earth Strike\n(Space)";
+    }
+
+    static void StretchToParent(RectTransform rect)
+    {
+        rect.anchorMin = Vector2.zero;
+        rect.anchorMax = Vector2.one;
+        rect.offsetMin = Vector2.zero;
+        rect.offsetMax = Vector2.zero;
+    }
+
 
     void BuildOverlay(Transform parent)
     {
