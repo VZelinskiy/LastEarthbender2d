@@ -134,10 +134,10 @@ TextureImporter:
       name: Ball_Lava
       rect:
         serializedVersion: 2
-        x: 80
-        y: 72
-        width: 343
-        height: 343
+        x: 84
+        y: 84
+        width: 328
+        height: 328
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}

@@ -134,10 +134,10 @@ TextureImporter:
       name: Ball_Crystal
       rect:
         serializedVersion: 2
-        x: 109
-        y: 108
-        width: 281
-        height: 281
+        x: 117
+        y: 116
+        width: 265
+        height: 265
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
