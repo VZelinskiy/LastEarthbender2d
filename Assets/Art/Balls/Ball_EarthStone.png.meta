@@ -5,11 +5,14 @@ TextureImporter:
   - first:
       213: -5359396356136771536
     second: lucid-origin_game_asset_single_round_earth_stone_ball_hand-painted_cartoon_style_soft_outline-0-removebg-preview_0
+  - first:
+      213: -5373607474729345809
+    second: Ball_EarthStone
   externalObjects: {}
   serializedVersion: 13
   mipmaps:
     mipMapMode: 0
-    enableMipMap: 0
+    enableMipMap: 1
     sRGBTexture: 1
     linearTexture: 0
     fadeOut: 0
@@ -74,7 +77,7 @@ TextureImporter:
   platformSettings:
   - serializedVersion: 4
     buildTarget: DefaultTexturePlatform
-    maxTextureSize: 2048
+    maxTextureSize: 256
     resizeAlgorithm: 0
     textureFormat: -1
     textureCompression: 1
@@ -128,23 +131,23 @@ TextureImporter:
     serializedVersion: 2
     sprites:
     - serializedVersion: 2
-      name: lucid-origin_game_asset_single_round_earth_stone_ball_hand-painted_cartoon_style_soft_outline-0-removebg-preview_0
+      name: Ball_EarthStone
       rect:
         serializedVersion: 2
-        x: 106
-        y: 107
-        width: 288
-        height: 287
+        x: 104
+        y: 104
+        width: 292
+        height: 292
       alignment: 0
-      pivot: {x: 0, y: 0}
+      pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
       customData: 
       outline: []
       physicsShape: []
       tessellationDetail: -1
       bones: []
-      spriteID: 030e1fdc8699f95b0800000000000000
-      internalID: -5359396356136771536
+      spriteID: fec9f5ae87c1d65b0800000000000000
+      internalID: -5373607474729345809
       vertices: []
       indices: 
       edges: []
@@ -163,6 +166,7 @@ TextureImporter:
     spriteCustomMetadata:
       entries: []
     nameFileIdTable:
+      Ball_EarthStone: -5373607474729345809
       lucid-origin_game_asset_single_round_earth_stone_ball_hand-painted_cartoon_style_soft_outline-0-removebg-preview_0: -5359396356136771536
   mipmapLimitGroupName: 
   pSDRemoveMatte: 0

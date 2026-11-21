@@ -37,6 +37,9 @@ public class BallChain : MonoBehaviour
         new Color(0.70f, 0.45f, 0.85f), // purple
     };
 
+    [Header("Ball art (optional - without it the coloured circles above are used)")]
+    [SerializeField] Sprite[] typeSprites;
+
     readonly List<Ball> balls = new List<Ball>();
     float headDistance;
     bool isFinished;
@@ -154,7 +157,7 @@ public class BallChain : MonoBehaviour
         ballObject.transform.SetParent(transform, false);
 
         var ball = ballObject.AddComponent<Ball>();
-        ball.Init(typeIndex, colors[typeIndex], ballDiameter);
+        ball.Init(typeIndex, GetSprite(typeIndex), GetColor(typeIndex), ballDiameter);
         ball.Distance = startDistance;
         return ball;
     }
@@ -237,10 +240,23 @@ public class BallChain : MonoBehaviour
     }
 
 
+    /// <summary>Tint for a ball type: white for real artwork, the placeholder colour otherwise.</summary>
     public Color GetColor(int typeIndex)
     {
-        return colors[typeIndex];
+        return HasArt(typeIndex) ? Color.white : colors[typeIndex];
     }
+
+    /// <summary>Sprite for a ball type: the artwork if assigned, otherwise the placeholder circle.</summary>
+    public Sprite GetSprite(int typeIndex)
+    {
+        return HasArt(typeIndex) ? typeSprites[typeIndex] : PlaceholderSprites.Circle;
+    }
+
+    bool HasArt(int typeIndex)
+    {
+        return typeSprites != null && typeIndex >= 0 && typeIndex < typeSprites.Length && typeSprites[typeIndex] != null;
+    }
+
 
     /// <summary>Finds the visible ball nearest to a world position, within hitRadius.</summary>
     public bool TryFindHit(Vector3 worldPosition, float hitRadius, out int hitBallIndex)

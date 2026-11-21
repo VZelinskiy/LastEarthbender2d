@@ -24,11 +24,12 @@ public class Projectile : MonoBehaviour
         direction = launchDirection.normalized;
         speed = launchSpeed;
 
+        Sprite sprite = chain.GetSprite(typeIndex);
         var spriteRenderer = gameObject.AddComponent<SpriteRenderer>();
-        spriteRenderer.sprite = PlaceholderSprites.Circle;
+        spriteRenderer.sprite = sprite;
         spriteRenderer.color = chain.GetColor(typeIndex);
         spriteRenderer.sortingOrder = 5;
-        transform.localScale = Vector3.one * chain.BallDiameter;
+        transform.localScale = Vector3.one * BallSprites.ScaleFor(sprite, chain.BallDiameter);
     }
 
     /// <summary>Launches the heavy stone of the Earth Strike ability instead of an ordinary ball.</summary>

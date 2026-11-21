@@ -6,6 +6,7 @@ public class Ball : MonoBehaviour
     SpriteRenderer spriteRenderer;
     const float LabelCharacterSize = 0.07f;
 
+    float ballDiameter;
     bool isPopping;
     float popTimer;
     float popDuration;
@@ -26,14 +27,15 @@ public class Ball : MonoBehaviour
     /// <summary>The special power this ball carries (Normal for most balls).</summary>
     public BallKind Kind { get; private set; }
 
-    public void Init(int type, Color color, float diameter)
+    public void Init(int type, Sprite sprite, Color tint, float diameter)
     {
         if (spriteRenderer == null) spriteRenderer = GetComponent<SpriteRenderer>();
 
         Type = type;
-        spriteRenderer.sprite = PlaceholderSprites.Circle;
-        spriteRenderer.color = color;
-        transform.localScale = Vector3.one * diameter;
+        ballDiameter = diameter;
+        spriteRenderer.sprite = sprite;
+        spriteRenderer.color = tint;
+        transform.localScale = Vector3.one * BallSprites.ScaleFor(sprite, diameter);
     }
 
     /// <summary>Gives the ball a power and a letter on it so the player can tell it apart.</summary>
@@ -43,23 +45,39 @@ public class Ball : MonoBehaviour
         if (newKind == BallKind.Normal) return;
 
         var font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+        string letter = GetKindLetter(newKind);
 
-        var labelObject = new GameObject("BonusLabel");
-        labelObject.transform.SetParent(transform, false);
-        labelObject.transform.localPosition = new Vector3(0f, 0f, -0.01f);
+        // A dark copy slightly behind the white letter keeps it readable on both light and dark artwork.
+        var labelRoot = new GameObject("BonusLabel");
+        labelRoot.transform.SetParent(transform, false);
+        labelRoot.transform.localPosition = new Vector3(0f, 0f, -0.01f);
 
-        var textMesh = labelObject.AddComponent<TextMesh>();
+        // The ball itself is scaled to fit its artwork, so undo that to keep the letter a fixed world size.
+        float ballScale = Mathf.Max(transform.localScale.x, 0.0001f);
+        labelRoot.transform.localScale = Vector3.one * (ballDiameter / ballScale);
+
+        CreateLabelText(labelRoot.transform, font, letter, new Color(0.05f, 0.03f, 0.02f), new Vector3(0.02f, -0.02f, 0f), 1);
+        CreateLabelText(labelRoot.transform, font, letter, Color.white, Vector3.zero, 2);
+    }
+
+    static void CreateLabelText(Transform parent, Font font, string letter, Color color, Vector3 localOffset, int sortingOrder)
+    {
+        var textObject = new GameObject("Letter");
+        textObject.transform.SetParent(parent, false);
+        textObject.transform.localPosition = localOffset;
+
+        var textMesh = textObject.AddComponent<TextMesh>();
         textMesh.font = font;
-        textMesh.text = GetKindLetter(newKind);
+        textMesh.text = letter;
         textMesh.anchor = TextAnchor.MiddleCenter;
         textMesh.alignment = TextAlignment.Center;
         textMesh.characterSize = LabelCharacterSize;
         textMesh.fontSize = 64;
-        textMesh.color = new Color(0.1f, 0.07f, 0.04f);
+        textMesh.color = color;
 
-        var meshRenderer = labelObject.GetComponent<MeshRenderer>();
+        var meshRenderer = textObject.GetComponent<MeshRenderer>();
         meshRenderer.sharedMaterial = font.material;
-        meshRenderer.sortingOrder = 1;
+        meshRenderer.sortingOrder = sortingOrder;
     }
 
     static string GetKindLetter(BallKind kind)

@@ -153,6 +153,10 @@ MonoBehaviour:
   shotCooldown: 0.25
   projectileSpeed: 14
   minimumAimDistance: 0.5
+  strikeCooldown: 12
+  strikeRadiusInBalls: 2
+  strikeSpeedMultiplier: 1.3
+  aimGuideDuration: 8
   muzzleDistance: 0.9
   bodyColor: {r: 0.55, g: 0.4, b: 0.25, a: 1}
   barrelColor: {r: 0.35, g: 0.25, b: 0.15, a: 1}
@@ -1109,12 +1113,23 @@ MonoBehaviour:
   ballDiameter: 0.6
   catchUpSpeed: 10
   rollbackSpeed: 3
+  slowDuration: 6
+  slowFactor: 0.4
+  reverseDuration: 3
+  reverseSpeed: 2
+  bombRadiusInBalls: 2
   colors:
   - {r: 0.85, g: 0.27, b: 0.22, a: 1}
   - {r: 0.3, g: 0.62, b: 0.9, a: 1}
   - {r: 0.95, g: 0.8, b: 0.25, a: 1}
   - {r: 0.4, g: 0.75, b: 0.38, a: 1}
   - {r: 0.7, g: 0.45, b: 0.85, a: 1}
+  typeSprites:
+  - {fileID: -3009773207228934275, guid: 6cbc2467e1bbe644e8f1c33969adfc29, type: 3}
+  - {fileID: -3484839272454781642, guid: 5a9b0d1ffec50b743b4cc08698fb4b1d, type: 3}
+  - {fileID: -6299728069758674318, guid: dbe9c51e92d52cb4facb80bac345e874, type: 3}
+  - {fileID: 5891580807343013007, guid: b12a0e3b762982145ab0ce8644517a2b, type: 3}
+  - {fileID: -5373607474729345809, guid: 3240ac5a87c4a3a43acaed9948f76d3a, type: 3}
 --- !u!4 &1868445659
 Transform:
   m_ObjectHideFlags: 0

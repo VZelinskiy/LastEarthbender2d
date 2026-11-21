@@ -5,11 +5,14 @@ TextureImporter:
   - first:
       213: 9094668712651768677
     second: lucid-origin_game_asset_single_round_sandstone_ball_hand-painted_cartoon_style_soft_outline_t-0-removebg-preview_0
+  - first:
+      213: 5891580807343013007
+    second: Ball_Sandstone
   externalObjects: {}
   serializedVersion: 13
   mipmaps:
     mipMapMode: 0
-    enableMipMap: 0
+    enableMipMap: 1
     sRGBTexture: 1
     linearTexture: 0
     fadeOut: 0
@@ -74,7 +77,7 @@ TextureImporter:
   platformSettings:
   - serializedVersion: 4
     buildTarget: DefaultTexturePlatform
-    maxTextureSize: 2048
+    maxTextureSize: 256
     resizeAlgorithm: 0
     textureFormat: -1
     textureCompression: 1
@@ -128,23 +131,23 @@ TextureImporter:
     serializedVersion: 2
     sprites:
     - serializedVersion: 2
-      name: lucid-origin_game_asset_single_round_sandstone_ball_hand-painted_cartoon_style_soft_outline_t-0-removebg-preview_0
+      name: Ball_Sandstone
       rect:
         serializedVersion: 2
-        x: 109
-        y: 81
-        width: 291
-        height: 312
+        x: 96
+        y: 78
+        width: 316
+        height: 316
       alignment: 0
-      pivot: {x: 0, y: 0}
+      pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
       customData: 
       outline: []
       physicsShape: []
       tessellationDetail: -1
       bones: []
-      spriteID: 563c77f2201c63e70800000000000000
-      internalID: 9094668712651768677
+      spriteID: f8c7033878913c150800000000000000
+      internalID: 5891580807343013007
       vertices: []
       indices: 
       edges: []
@@ -163,6 +166,7 @@ TextureImporter:
     spriteCustomMetadata:
       entries: []
     nameFileIdTable:
+      Ball_Sandstone: 5891580807343013007
       lucid-origin_game_asset_single_round_sandstone_ball_hand-painted_cartoon_style_soft_outline_t-0-removebg-preview_0: 9094668712651768677
   mipmapLimitGroupName: 
   pSDRemoveMatte: 0

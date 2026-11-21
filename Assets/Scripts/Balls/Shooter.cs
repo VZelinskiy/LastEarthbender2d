@@ -232,9 +232,19 @@ public class Shooter : MonoBehaviour
 
     void RefreshBallVisuals()
     {
-        loadedBallRenderer.color = chain.GetColor(loadedType);
-        nextBallRenderer.color = chain.GetColor(nextType);
+        ApplyBallLook(loadedBallRenderer, loadedType, chain.BallDiameter);
+        ApplyBallLook(nextBallRenderer, nextType, chain.BallDiameter * 0.6f);
     }
+
+    // Shows a ball type (artwork or placeholder circle) at the given world diameter.
+    void ApplyBallLook(SpriteRenderer target, int typeIndex, float diameter)
+    {
+        Sprite sprite = chain.GetSprite(typeIndex);
+        target.sprite = sprite;
+        target.color = chain.GetColor(typeIndex);
+        target.transform.localScale = Vector3.one * BallSprites.ScaleFor(sprite, diameter);
+    }
+
 
     void BuildPlaceholderVisuals()
     {
