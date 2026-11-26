@@ -25,6 +25,20 @@ public class Shooter : MonoBehaviour
     [Header("Aim guide (Aim bonus)")]
     [SerializeField, Min(0f)] float aimGuideDuration = 8f;
 
+    [Header("Hero art (optional - without it the placeholder body is used)")]
+    [SerializeField] Sprite idleSprite;   // facing up (north); rotates to follow the aim
+    [SerializeField] Sprite shootSprite;  // shown briefly after a shot
+    [SerializeField] Sprite strikeSprite; // shown briefly after the Earth Strike
+    [SerializeField, Min(0.5f)] float heroWorldHeight = 1.8f;
+    [SerializeField, Min(0f)] float poseDuration = 0.15f;
+    [SerializeField, Min(0f)] float recoilDistance = 0.1f;
+
+    [Header("Hero art: standing figure that does not rotate (optional)")]
+    [SerializeField] bool rotateHeroWithAim = true; // true: top-down art that turns to the aim; false: a standing figure
+    [SerializeField] Sprite frontIdleSprite;   // used instead of the sprites above while aiming towards the camera
+    [SerializeField] Sprite frontShootSprite;
+    [SerializeField] Sprite frontStrikeSprite;
+
     [Header("Placeholder look")]
     [SerializeField] float muzzleDistance = 0.9f;
     [SerializeField] Color bodyColor = new Color(0.55f, 0.40f, 0.25f);
@@ -36,6 +50,20 @@ public class Shooter : MonoBehaviour
     int loadedType;
     int nextType;
     float cooldownTimer;
+
+    const float RecoilRecoverSpeed = 1.2f;
+    SpriteRenderer heroRenderer;
+    float poseTimer;
+    float recoilAmount;
+    bool facingFront;
+    HeroPose currentPose;
+
+    enum HeroPose
+    {
+        Idle,
+        Shoot,
+        Strike
+    }
 
     /// <summary>Set to false to stop aiming and shooting (game over, menus).</summary>
     public bool InputEnabled { get; set; } = true;
@@ -105,6 +133,8 @@ public class Shooter : MonoBehaviour
             lastAimDirection = aimVector.normalized;
         }
 
+        UpdateHeroFacing();
+        UpdateHeroPose(Time.deltaTime);
         UpdateAimGuide();
 
         bool pointerIsBlocked = IsPointerBlocked != null && IsPointerBlocked(screenPosition);
@@ -129,7 +159,73 @@ public class Shooter : MonoBehaviour
         RefreshBallVisuals();
 
         cooldownTimer = shotCooldown;
+        PlayPose(HeroPose.Shoot, recoilDistance);
     }
+
+    // Switches the hero to another pose for a moment and kicks it back a little (art only).
+    // Switches the hero to another pose for a moment and kicks it back a little (art only).
+    void PlayPose(HeroPose pose, float recoil)
+    {
+        if (heroRenderer == null) return;
+
+        recoilAmount = recoil;
+        currentPose = pose;
+        poseTimer = poseDuration;
+        ShowHeroSprite(GetHeroSprite(pose));
+    }
+
+    void UpdateHeroPose(float deltaTime)
+    {
+        if (heroRenderer == null) return;
+
+        if (poseTimer > 0f)
+        {
+            poseTimer -= deltaTime;
+            if (poseTimer <= 0f)
+            {
+                currentPose = HeroPose.Idle;
+                ShowHeroSprite(GetHeroSprite(currentPose));
+            }
+        }
+
+        // The kick goes against the aim: a turning hero moves along its own back, a standing one along the world.
+        recoilAmount = Mathf.MoveTowards(recoilAmount, 0f, RecoilRecoverSpeed * deltaTime);
+        Vector2 recoilDirection = rotateHeroWithAim ? Vector2.down : -lastAimDirection;
+        heroRenderer.transform.localPosition = recoilDirection * recoilAmount;
+    }
+
+    // Standing hero: back view while aiming up the screen, front view while aiming towards the camera.
+    void UpdateHeroFacing()
+    {
+        if (heroRenderer == null || rotateHeroWithAim) return;
+
+        // Two thresholds (hysteresis) so the hero does not flicker when the aim is close to horizontal.
+        bool shouldFaceFront = facingFront ? lastAimDirection.y < 0.25f : lastAimDirection.y < -0.25f;
+        if (shouldFaceFront == facingFront) return;
+
+        facingFront = shouldFaceFront;
+        ShowHeroSprite(GetHeroSprite(currentPose));
+    }
+
+    // Picks the sprite for a pose, falling back to the idle one of the same facing when a pose has no artwork.
+    Sprite GetHeroSprite(HeroPose pose)
+    {
+        Sprite backSprite = pose == HeroPose.Shoot ? shootSprite : (pose == HeroPose.Strike ? strikeSprite : idleSprite);
+        Sprite frontSprite = pose == HeroPose.Shoot ? frontShootSprite : (pose == HeroPose.Strike ? frontStrikeSprite : frontIdleSprite);
+        bool useFront = !rotateHeroWithAim && facingFront;
+
+        Sprite chosen = useFront ? frontSprite : backSprite;
+        if (chosen == null) chosen = useFront ? frontIdleSprite : idleSprite;
+        return chosen != null ? chosen : idleSprite;
+    }
+
+
+    void ShowHeroSprite(Sprite heroSprite)
+    {
+        heroRenderer.sprite = heroSprite;
+        heroRenderer.transform.localScale = Vector3.one * SpriteFit.ScaleForHeight(heroSprite, heroWorldHeight);
+    }
+
 
     /// <summary>Loads fresh balls, e.g. when a new level starts.</summary>
     public void ResetShooter()
@@ -143,6 +239,12 @@ public class Shooter : MonoBehaviour
         strikeTimer = 0f;
         guideTimer = 0f;
         HideGuide();
+
+        facingFront = false;
+        currentPose = HeroPose.Idle;
+        poseTimer = 0f;
+        recoilAmount = 0f;
+        if (heroRenderer != null) ShowHeroSprite(GetHeroSprite(HeroPose.Idle));
     }
 
     void OnDestroy()
@@ -167,6 +269,7 @@ public class Shooter : MonoBehaviour
         projectile.LaunchStrike(chain, lastAimDirection, projectileSpeed * strikeSpeedMultiplier, strikeRadiusInBalls);
 
         strikeTimer = strikeCooldown;
+        PlayPose(HeroPose.Strike, recoilDistance * 2f);
         return true;
     }
 
@@ -251,12 +354,26 @@ public class Shooter : MonoBehaviour
         aimPivot = new GameObject("AimPivot").transform;
         aimPivot.SetParent(transform, false);
 
-        CreateVisual("Body", transform, PlaceholderSprites.Circle, bodyColor, Vector3.zero, new Vector3(1.2f, 1.2f, 1f), 10);
-        CreateVisual("Barrel", aimPivot, PlaceholderSprites.Square, barrelColor, new Vector3(0f, 0.45f, 0f), new Vector3(0.3f, 0.7f, 1f), 11);
-
         float ballDiameter = chain.BallDiameter;
+        Vector3 nextBallPosition;
+
+        if (idleSprite != null)
+        {
+            // Real artwork. A top-down sprite turns with the aim; a standing figure stays upright.
+            Transform heroParent = rotateHeroWithAim ? aimPivot : transform;
+            heroRenderer = CreateVisual("HeroArt", heroParent, idleSprite, Color.white, Vector3.zero, Vector3.one, 10);
+            ShowHeroSprite(idleSprite);
+            nextBallPosition = new Vector3(0f, -heroWorldHeight * 0.5f - 0.1f, 0f);
+        }
+        else
+        {
+            CreateVisual("Body", transform, PlaceholderSprites.Circle, bodyColor, Vector3.zero, new Vector3(1.2f, 1.2f, 1f), 10);
+            CreateVisual("Barrel", aimPivot, PlaceholderSprites.Square, barrelColor, new Vector3(0f, 0.45f, 0f), new Vector3(0.3f, 0.7f, 1f), 11);
+            nextBallPosition = new Vector3(0f, -0.4f, 0f);
+        }
+
         loadedBallRenderer = CreateVisual("LoadedBall", aimPivot, PlaceholderSprites.Circle, Color.white, new Vector3(0f, muzzleDistance, 0f), Vector3.one * ballDiameter, 12);
-        nextBallRenderer = CreateVisual("NextBall", aimPivot, PlaceholderSprites.Circle, Color.white, new Vector3(0f, -0.4f, 0f), Vector3.one * ballDiameter * 0.6f, 12);
+        nextBallRenderer = CreateVisual("NextBall", aimPivot, PlaceholderSprites.Circle, Color.white, nextBallPosition, Vector3.one * ballDiameter * 0.6f, 12);
     }
 
     static SpriteRenderer CreateVisual(string visualName, Transform parent, Sprite sprite, Color color, Vector3 localPosition, Vector3 localScale, int sortingOrder)

@@ -157,6 +157,16 @@ MonoBehaviour:
   strikeRadiusInBalls: 2
   strikeSpeedMultiplier: 1.3
   aimGuideDuration: 8
+  idleSprite: {fileID: 1423233803936645099, guid: 624ace051319a154fa65f2d94b83b0ff, type: 3}
+  shootSprite: {fileID: 0}
+  strikeSprite: {fileID: 0}
+  heroWorldHeight: 1.6
+  poseDuration: 0.15
+  recoilDistance: 0.1
+  rotateHeroWithAim: 0
+  frontIdleSprite: {fileID: 1480540559410453633, guid: eb05d28e68a880e4b9d83a39077b834e, type: 3}
+  frontShootSprite: {fileID: 1052488209131999751, guid: 5bad3f4d5d5852b4c814e36c1cf38ddd, type: 3}
+  frontStrikeSprite: {fileID: 1052488209131999751, guid: 5bad3f4d5d5852b4c814e36c1cf38ddd, type: 3}
   muzzleDistance: 0.9
   bodyColor: {r: 0.55, g: 0.4, b: 0.25, a: 1}
   barrelColor: {r: 0.35, g: 0.25, b: 0.15, a: 1}
